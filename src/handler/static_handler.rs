@@ -1,10 +1,6 @@
-use std::{io::Error, path::PathBuf};
+use std::{ io::Error, path::PathBuf };
 
-use tokio::{
-    fs,
-    io::{AsyncReadExt, AsyncWriteExt},
-    net::TcpStream,
-};
+use tokio::{ fs, io::{ AsyncReadExt, AsyncWriteExt }, net::TcpStream };
 
 pub async fn handle_static_files(stream: &mut TcpStream, root: &PathBuf) -> Result<(), Error> {
     let mut buff = [0; 1024];
@@ -19,7 +15,6 @@ pub async fn handle_static_files(stream: &mut TcpStream, root: &PathBuf) -> Resu
             return Err(Error::other(format!("Error {}", e)));
         }
     };
-
     let request = String::from_utf8_lossy(&buff[..n]);
     let request_line = request.lines().next().unwrap_or("");
     let mut parts = request_line.split_whitespace();
@@ -63,17 +58,24 @@ pub async fn handle_static_files(stream: &mut TcpStream, root: &PathBuf) -> Resu
             println!("Ok");
             return Ok(());
         } else {
+            // Send 404 response before closing
+            let response =
+                b"HTTP/1.1 404 NOT FOUND\r\nContent-Length: 0\r\nContent-Type: text/plain\r\nConnection: close\r\n\r\n";
+            let _ = stream.write_all(response).await;
+            let _ = stream.flush().await;
+            let _ = stream.shutdown().await;
+
             return Err(Error::other("File not found"));
         }
     }
 
-    let response = format!(
-        "HTTP/1.1 404 NOT FOUND\r\nContent-Length: {}\r\nContent-Type: {}\r\nConnection: close\r\n\r\n",
-        0, ""
-    );
-
-    let _ = stream.write(response.as_bytes()).await;
+    // Invalid path - send 404 and close
+    let response =
+        b"HTTP/1.1 404 NOT FOUND\r\nContent-Length: 0\r\nContent-Type: text/plain\r\nConnection: close\r\n\r\n";
+    let _ = stream.write_all(response).await;
     let _ = stream.flush().await;
+    let _ = stream.shutdown().await;
+
     return Err(Error::other("Invalid path requested"));
 }
 
@@ -87,7 +89,8 @@ fn safe_path(root: &PathBuf, requested_path: &str) -> Option<PathBuf> {
         } else {
             eprintln!(
                 "Reqested Path {:?} doesn't start with root {:?}",
-                requested_path, canon_root
+                requested_path,
+                canon_root
             );
         }
     }
