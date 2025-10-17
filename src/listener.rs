@@ -1,10 +1,10 @@
-use std::{ io::{ Error }, path::{ PathBuf } };
+use std::{io::Error, path::PathBuf};
 
 use crate::{
     config::ServerConfig,
-    handler::{ proxy_handler::handle_proxy, static_handler::handle_static_files },
+    handler::{proxy_handler::handle_proxy, static_handler::handle_static_files},
 };
-use tokio::{ io::AsyncWriteExt, net::TcpListener };
+use tokio::{io::AsyncWriteExt, net::TcpListener};
 
 pub async fn listen(config: &ServerConfig) -> Result<(), Error> {
     let addr = format!("0.0.0.0:{}", config.listen);
@@ -21,7 +21,6 @@ pub async fn listen(config: &ServerConfig) -> Result<(), Error> {
             tokio::spawn(async move {
                 if let Err(e) = handle_static_files(&mut stream, &root_dir_clone).await {
                     eprintln!("Error handling {}: {}", addr, e);
-                    
                 }
             });
         }

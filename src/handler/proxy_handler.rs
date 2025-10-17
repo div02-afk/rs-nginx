@@ -1,10 +1,10 @@
 use std::io::Error;
 
-use tokio::{ io::copy, net::{ TcpStream }, try_join };
+use tokio::{io::copy, net::TcpStream, try_join};
 
 pub async fn handle_proxy(
     request_stream: &mut TcpStream,
-    proxy_address: &String
+    proxy_address: &String,
 ) -> Result<(), Error> {
     println!("Connecting to: {}", proxy_address.clone());
     let client_stream_result = TcpStream::connect(proxy_address).await;

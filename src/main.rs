@@ -1,5 +1,4 @@
-use std::{path::Path, rc::Rc, sync::Arc};
-
+use std::{path::Path, sync::Arc};
 use crate::{config::read_config, listener::listen};
 
 mod config;
