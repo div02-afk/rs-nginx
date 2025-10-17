@@ -8,7 +8,7 @@ pub struct StaticFileConfig {
     pub dir: Vec<String>,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq,Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct ServerConfig {
     pub listen: u16,
     pub root: Option<String>,
