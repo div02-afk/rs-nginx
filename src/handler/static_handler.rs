@@ -1,10 +1,8 @@
-use std::{io::Error, path::PathBuf};
+use std::{ io::Error, path::PathBuf };
 
-use tokio::{
-    fs,
-    io::{AsyncReadExt, AsyncWriteExt},
-    net::TcpStream,
-};
+use tokio::{ fs, io::{ AsyncReadExt, AsyncWriteExt }, net::TcpStream };
+
+use crate::response_builder::http::{ create_response, BAD_REQUEST_RESPONSE, NOT_FOUND_RESPONSE };
 
 pub async fn handle_static_files(stream: &mut TcpStream, root: &PathBuf) -> Result<(), Error> {
     let mut buff = [0; 1024];
@@ -35,25 +33,8 @@ pub async fn handle_static_files(stream: &mut TcpStream, root: &PathBuf) -> Resu
             let mut contents = Vec::new();
             let _ = file.read_to_end(&mut contents).await.unwrap();
 
-            //TODO: add method to build a response
-            let content_type = if path.extension().and_then(|s| s.to_str()) == Some("html") {
-                "text/html"
-            } else if path.extension().and_then(|s| s.to_str()) == Some("css") {
-                "text/css"
-            } else if path.extension().and_then(|s| s.to_str()) == Some("js") {
-                "application/javascript"
-            } else {
-                "application/octet-stream"
-            };
-
-            let response = format!(
-                "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nContent-Type: {}\r\nConnection: close\r\n\r\n",
-                contents.len(),
-                content_type
-            );
-
             // Send headers
-            stream.write_all(response.as_bytes()).await.unwrap();
+            stream.write_all(create_response(&contents, &path).as_bytes()).await.unwrap();
 
             // Send file contents
             stream.write_all(&contents).await.unwrap();
@@ -63,9 +44,8 @@ pub async fn handle_static_files(stream: &mut TcpStream, root: &PathBuf) -> Resu
             return Ok(());
         } else {
             // Send 404 response before closing
-            let response =
-                b"HTTP/1.1 404 NOT FOUND\r\nContent-Length: 0\r\nContent-Type: text/plain\r\nConnection: close\r\n\r\n";
-            let _ = stream.write_all(response).await;
+
+            let _ = stream.write_all(NOT_FOUND_RESPONSE).await;
             let _ = stream.flush().await;
             let _ = stream.shutdown().await;
 
@@ -73,10 +53,9 @@ pub async fn handle_static_files(stream: &mut TcpStream, root: &PathBuf) -> Resu
         }
     }
 
-    // Invalid path - send 404 and close
-    let response =
-        b"HTTP/1.1 404 NOT FOUND\r\nContent-Length: 0\r\nContent-Type: text/plain\r\nConnection: close\r\n\r\n";
-    let _ = stream.write_all(response).await;
+    // Invalid path - send 400 and close
+
+    let _ = stream.write_all(BAD_REQUEST_RESPONSE).await;
     let _ = stream.flush().await;
     let _ = stream.shutdown().await;
 
@@ -84,7 +63,7 @@ pub async fn handle_static_files(stream: &mut TcpStream, root: &PathBuf) -> Resu
 }
 
 fn safe_path(root: &PathBuf, requested_path: &str) -> Option<PathBuf> {
-    let requested_path = requested_path.trim_start_matches(|c| c == '/' || c == '\\');
+    let requested_path = requested_path.trim_start_matches(|c| (c == '/' || c == '\\'));
     let path = root.as_path().join(requested_path);
     // println!("root {:?},requested {}, pathbuf {:?}", root, requested_path, path);
     if let (Ok(path), Ok(canon_root)) = (path.canonicalize(), root.canonicalize()) {
@@ -93,7 +72,8 @@ fn safe_path(root: &PathBuf, requested_path: &str) -> Option<PathBuf> {
         } else {
             eprintln!(
                 "Reqested Path {:?} doesn't start with root {:?}",
-                requested_path, canon_root
+                requested_path,
+                canon_root
             );
         }
     }
