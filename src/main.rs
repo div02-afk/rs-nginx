@@ -1,4 +1,4 @@
-use crate::{ cache::lru::Cache, config::read_config, listener::listen };
+use crate::{ config::read_config, listener::listen };
 use std::{ path::Path, sync::Arc };
 
 mod cache;
@@ -9,8 +9,6 @@ mod response_builder;
 
 #[tokio::main]
 async fn main() {
-    let cache = Cache::new(1024);
-
     let config_path = Path::new("config.yaml");
     if !config_path.exists() {
         panic!("Config not found");

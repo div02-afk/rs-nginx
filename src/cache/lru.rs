@@ -36,11 +36,13 @@ impl Cache {
         }
     }
     pub async fn get(&self, key: &PathBuf) -> Option<Vec<u8>> {
+         println!("getting cached data for {:?}",key);
         let cache_map = self.cache_map.read().await;
-
-        if let Some(weak_cache_ll_entry) = cache_map.get(key) {
+        println!("acquired cachemap log");
+        if let Some(weak_cache_ll_entry) = cache_map.get(key).cloned() {
+            drop(cache_map); 
             if let Some(cache_ll_entry) = weak_cache_ll_entry.upgrade() {
-                move_node_to_head(&self.cache_ll_head, weak_cache_ll_entry, None).await;
+                move_node_to_head(&self.cache_ll_head, &weak_cache_ll_entry, None).await;
                 let node = cache_ll_entry.read().await;
                 return Some(node.cache_entry.data.clone());
             }
@@ -51,7 +53,7 @@ impl Cache {
     pub async fn add(&self, key: &PathBuf, data: &Vec<u8>) {
         let mut cache_map = self.cache_map.write().await;
 
-        if let Some(node) = cache_map.get(key) {
+        if let Some(node) = cache_map.get(key).clone() {
             move_node_to_head(&self.cache_ll_head, node, Some(data)).await;
         } else {
             let mut node = CacheList::default();

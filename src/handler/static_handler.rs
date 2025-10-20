@@ -1,14 +1,17 @@
-use std::{io::Error, path::PathBuf};
+use std::{ io::Error, path::{ Path, PathBuf }, sync::Arc };
 
-use tokio::{
-    fs,
-    io::{AsyncReadExt, AsyncWriteExt},
-    net::TcpStream,
+use tokio::{ fs, io::{ AsyncReadExt, AsyncWriteExt }, net::TcpStream };
+
+use crate::{
+    cache::lru::Cache,
+    response_builder::http::{ create_response, BAD_REQUEST_RESPONSE, NOT_FOUND_RESPONSE },
 };
 
-use crate::response_builder::http::{BAD_REQUEST_RESPONSE, NOT_FOUND_RESPONSE, create_response};
-
-pub async fn handle_static_files(stream: &mut TcpStream, root: &PathBuf) -> Result<(), Error> {
+pub async fn handle_static_files(
+    stream: &mut TcpStream,
+    root: &PathBuf,
+    cache: &Arc<Cache>
+) -> Result<(), Error> {
     let mut buff = [0; 1024];
 
     let n = match stream.read(&mut buff).await {
@@ -29,19 +32,30 @@ pub async fn handle_static_files(stream: &mut TcpStream, root: &PathBuf) -> Resu
 
     println!("Method {}, Path {}", method, requested_path);
 
+    //checking cached response
+
     if let Some(path) = safe_path(root, requested_path) {
+        if method.to_lowercase().eq("get") {
+           
+            if let Some(data) = cache.get(&path).await {
+                stream.write_all(create_response(&data, &path).as_bytes()).await.unwrap();
+                // Send file contents
+                stream.write_all(&data).await.unwrap();
+                stream.flush().await.unwrap();
+
+                println!("Cached Ok");
+                return Ok(());
+            }
+        }
         let file_result = fs::File::open(&path).await;
         if file_result.is_ok() {
             let mut file = file_result.unwrap();
             println!("file size: {:?}", file.metadata().await.unwrap().len());
             let mut contents = Vec::new();
             let _ = file.read_to_end(&mut contents).await.unwrap();
-
+            cache.add(&path, &contents).await;
             // Send headers
-            stream
-                .write_all(create_response(&contents, &path).as_bytes())
-                .await
-                .unwrap();
+            stream.write_all(create_response(&contents, &path).as_bytes()).await.unwrap();
 
             // Send file contents
             stream.write_all(&contents).await.unwrap();
@@ -70,7 +84,7 @@ pub async fn handle_static_files(stream: &mut TcpStream, root: &PathBuf) -> Resu
 }
 
 fn safe_path(root: &PathBuf, requested_path: &str) -> Option<PathBuf> {
-    let requested_path = requested_path.trim_start_matches(|c| c == '/' || c == '\\');
+    let requested_path = requested_path.trim_start_matches(|c| (c == '/' || c == '\\'));
     let path = root.as_path().join(requested_path);
     // println!("root {:?},requested {}, pathbuf {:?}", root, requested_path, path);
     if let (Ok(path), Ok(canon_root)) = (path.canonicalize(), root.canonicalize()) {
@@ -79,7 +93,8 @@ fn safe_path(root: &PathBuf, requested_path: &str) -> Option<PathBuf> {
         } else {
             eprintln!(
                 "Reqested Path {:?} doesn't start with root {:?}",
-                requested_path, canon_root
+                requested_path,
+                canon_root
             );
         }
     }

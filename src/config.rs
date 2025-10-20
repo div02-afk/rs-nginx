@@ -1,6 +1,6 @@
-use std::{fs::File, path::Path};
+use std::{ fs::File, path::Path };
 
-use serde::{Deserialize, Serialize};
+use serde::{ Deserialize, Serialize };
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct StaticFileConfig {
@@ -11,6 +11,7 @@ pub struct StaticFileConfig {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct ServerConfig {
     pub listen: u16,
+    pub cache: Option<usize>,
     pub root: Option<String>,
     pub proxy: Option<String>,
 }
