@@ -1,8 +1,12 @@
-use std::{ collections::HashMap, path::PathBuf, sync::{ Arc, Weak } };
+use std::{
+    collections::HashMap,
+    path::PathBuf,
+    sync::{Arc, Weak},
+};
 
-use tokio::sync::{ RwLock };
+use tokio::sync::RwLock;
 
-use crate::cache::util::{ add_after_head, move_node_to_head, purge };
+use crate::cache::util::{add_after_head, move_node_to_head};
 
 #[derive(Default, Debug)]
 pub struct CacheEntry {
@@ -21,7 +25,7 @@ pub struct Cache {
     cache_map: RwLock<HashMap<PathBuf, Weak<RwLock<CacheList>>>>,
     cache_ll_head: Arc<RwLock<CacheList>>,
     cache_ll_tail: Arc<RwLock<CacheList>>,
-    capacity: usize, //in b
+    capacity: usize,  //in b
     data_size: usize, // in b
 }
 
@@ -36,11 +40,11 @@ impl Cache {
         }
     }
     pub async fn get(&self, key: &PathBuf) -> Option<Vec<u8>> {
-         println!("getting cached data for {:?}",key);
+        println!("getting cached data for {:?}", key);
         let cache_map = self.cache_map.read().await;
         println!("acquired cachemap log");
         if let Some(weak_cache_ll_entry) = cache_map.get(key).cloned() {
-            drop(cache_map); 
+            drop(cache_map);
             if let Some(cache_ll_entry) = weak_cache_ll_entry.upgrade() {
                 move_node_to_head(&self.cache_ll_head, &weak_cache_ll_entry, None).await;
                 let node = cache_ll_entry.read().await;

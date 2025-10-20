@@ -1,7 +1,9 @@
 use std::{io::Error, path::PathBuf, sync::Arc};
 
 use crate::{
-    cache::lru::Cache, config::ServerConfig, handler::{proxy_handler::handle_proxy, static_handler::handle_static_files}
+    cache::lru::Cache,
+    config::ServerConfig,
+    handler::{proxy_handler::handle_proxy, static_handler::handle_static_files},
 };
 use tokio::{io::AsyncWriteExt, net::TcpListener};
 
@@ -10,7 +12,7 @@ pub async fn listen(config: &ServerConfig) -> Result<(), Error> {
     let tcp_listener = TcpListener::bind(addr).await?;
     println!("listening on port {}", config.listen);
     let cache = Arc::new(Cache::new(config.cache.unwrap_or(0)));
-   
+
     //cache initialized
     if config.root.is_some() {
         let temp_root = config.root.clone().unwrap();
@@ -21,7 +23,9 @@ pub async fn listen(config: &ServerConfig) -> Result<(), Error> {
             let root_dir_clone = root_dir.clone();
             let cloned_cache = cache.clone();
             tokio::spawn(async move {
-                if let Err(e) = handle_static_files(&mut stream, &root_dir_clone,&cloned_cache).await {
+                if let Err(e) =
+                    handle_static_files(&mut stream, &root_dir_clone, &cloned_cache).await
+                {
                     eprintln!("Error handling {}: {}", addr, e);
                 }
             });

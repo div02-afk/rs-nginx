@@ -1,5 +1,5 @@
-use crate::{ config::read_config, listener::listen };
-use std::{ path::Path, sync::Arc };
+use crate::{config::read_config, listener::listen};
+use std::{path::Path, sync::Arc};
 
 mod cache;
 mod config;

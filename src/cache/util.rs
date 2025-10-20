@@ -1,8 +1,8 @@
-use std::{ sync::{ Arc, Weak } };
+use std::sync::{Arc, Weak};
 
 use tokio::sync::RwLock;
 
-use crate::cache::lru::{ Cache, CacheList };
+use crate::cache::lru::{Cache, CacheList};
 
 pub async fn add_after_head(head: &Arc<RwLock<CacheList>>, node: &Arc<RwLock<CacheList>>) {
     let mut head = head.write().await;
@@ -29,7 +29,7 @@ pub async fn add_after_head(head: &Arc<RwLock<CacheList>>, node: &Arc<RwLock<Cac
 pub async fn move_node_to_head(
     head: &Arc<RwLock<CacheList>>,
     node: &Weak<RwLock<CacheList>>,
-    data: Option<&Vec<u8>>
+    data: Option<&Vec<u8>>,
 ) {
     if let Some(current_node) = node.upgrade() {
         let head_lock = head.read().await;
