@@ -1,6 +1,9 @@
 http:
   - listen: 8080
-    root : "D:/Github/rs-ngnix/"
+    root: "D:/Github/rs-ngnix/"
     cache :: 1024
   - listen: 8081
     proxy: "127.0.0.1:8080"
+  - listen: 8082
+    root: "E:/Movies/Wednesday"
+    cache : 409600

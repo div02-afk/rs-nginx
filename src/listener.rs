@@ -19,7 +19,7 @@ pub async fn listen(config: &ServerConfig) -> Result<(), Error> {
         let root_dir = PathBuf::from(temp_root);
         loop {
             let (mut stream, addr) = tcp_listener.accept().await?;
-            println!("Received Static file request");
+            print!("Received Static file request : ");
             let root_dir_clone = root_dir.clone();
             let cloned_cache = cache.clone();
             tokio::spawn(async move {

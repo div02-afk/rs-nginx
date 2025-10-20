@@ -1,8 +1,4 @@
-use std::{
-    io::Error,
-    path::PathBuf,
-    sync::Arc,
-};
+use std::{io::Error, path::PathBuf, sync::Arc};
 
 use tokio::{
     fs,
