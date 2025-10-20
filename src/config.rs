@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 pub struct StaticFileConfig {
     pub path: String,
     pub dir: Vec<String>,
-} 
+}
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct ServerConfig {

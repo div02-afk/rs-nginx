@@ -6,7 +6,7 @@ pub async fn handle_proxy(
     request_stream: &mut TcpStream,
     proxy_address: &String,
 ) -> Result<(), Error> {
-    println!("Connecting to: {}", proxy_address.clone());
+    println!("Connecting to: {}", proxy_address);
     let client_stream_result = TcpStream::connect(proxy_address).await;
     if client_stream_result.is_ok() {
         let mut client_stream = client_stream_result.unwrap();

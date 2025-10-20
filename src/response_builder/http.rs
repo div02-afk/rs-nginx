@@ -5,7 +5,6 @@ pub const NOT_FOUND_RESPONSE: &[
     90
 ] = b"HTTP/1.1 404 NOT FOUND\r\nContent-Length: 0\r\nContent-Type: text/plain\r\nConnection: close\r\n\r\n";
 
-
 pub const BAD_REQUEST_RESPONSE: &[
     u8;
     92
