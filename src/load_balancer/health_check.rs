@@ -35,7 +35,7 @@ async fn check_health_single(address: &str, path: &str) -> Result<bool, std::io:
 
 /// Performs a simple HTTP health check on the given address
 /// Returns true if the server responds with HTTP 200, false otherwise
-async fn health_probe(address: &String, path: &String) -> bool {
+async fn health_probe(address: &String, path: &str) -> bool {
     println!("Checking health for {}", address);
     // Set a timeout for the health check (5 seconds)
     let result = timeout(Duration::from_secs(5), check_health_single(address, path)).await;
@@ -70,7 +70,7 @@ mod tests {
     #[tokio::test]
     async fn test_health_probe() {
         // Test with a known good endpoint (assuming test servers are running)
-        let result = health_probe(&"127.0.0.1:3001".to_string(), &"/health".to_string()).await;
+        let result = health_probe(&"127.0.0.1:3001".to_string(), "/health").await;
         println!("Health check result: {}", result);
     }
 }

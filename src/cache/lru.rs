@@ -89,7 +89,7 @@ impl Cache {
 
         let mut cache_map = self.cache_map.write().await;
 
-        if let Some(node) = cache_map.get(key).clone() {
+        if let Some(node) = cache_map.get(key) {
             move_node_to_head(&self.cache_ll_head, &self.cache_ll_tail, node, Some(data)).await;
         } else {
             let node = CacheList::new(key.to_path_buf(), CacheEntry::new(data.to_vec()));

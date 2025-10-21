@@ -1,12 +1,12 @@
-use std::{ io::Error, path::PathBuf, sync::Arc, thread::sleep, time::Duration };
+use std::{io::Error, path::PathBuf, sync::Arc, thread::sleep, time::Duration};
 
 use crate::{
     cache::lru::Cache,
-    config::{ ProxyType, ServerConfig },
-    handler::{ proxy_handler::handle_proxy, static_handler::handle_static_files },
-    load_balancer::{ health_check::check_health, round_robin::get_next_server },
+    config::{ProxyType, ServerConfig},
+    handler::{proxy_handler::handle_proxy, static_handler::handle_static_files},
+    load_balancer::{health_check::check_health, round_robin::get_next_server},
 };
-use tokio::{ io::AsyncWriteExt, net::TcpListener, sync::RwLock };
+use tokio::{io::AsyncWriteExt, net::TcpListener, sync::RwLock};
 
 pub async fn listen(config: &ServerConfig) -> Result<(), Error> {
     let addr = format!("0.0.0.0:{}", config.listen);
@@ -24,12 +24,8 @@ pub async fn listen(config: &ServerConfig) -> Result<(), Error> {
             let root_dir_clone = root_dir.clone();
             let cloned_cache = cache.clone();
             tokio::spawn(async move {
-                if
-                    let Err(e) = handle_static_files(
-                        &mut stream,
-                        &root_dir_clone,
-                        &cloned_cache
-                    ).await
+                if let Err(e) =
+                    handle_static_files(&mut stream, &root_dir_clone, &cloned_cache).await
                 {
                     eprintln!("Error handling {}: {}", addr, e);
                 }
@@ -38,25 +34,28 @@ pub async fn listen(config: &ServerConfig) -> Result<(), Error> {
     } else if config.proxy.is_some() {
         let proxy_addr = config.proxy.clone().unwrap();
         match proxy_addr {
-            ProxyType::Single(proxy_addr) =>
-                loop {
-                    let (mut stream, addr) = tcp_listener.accept().await?;
-                    let proxy_addr_clone = proxy_addr.clone();
-                    println!("Received Proxy request");
-                    tokio::spawn(async move {
-                        if let Err(e) = handle_proxy(&mut stream, &proxy_addr_clone).await {
-                            eprintln!("Error handling {}: {}", addr, e);
-                            let _ = stream.shutdown().await;
-                        }
-                    });
-                }
+            ProxyType::Single(proxy_addr) => loop {
+                let (mut stream, addr) = tcp_listener.accept().await?;
+                let proxy_addr_clone = proxy_addr.clone();
+                println!("Received Proxy request");
+                tokio::spawn(async move {
+                    if let Err(e) = handle_proxy(&mut stream, &proxy_addr_clone).await {
+                        eprintln!("Error handling {}: {}", addr, e);
+                        let _ = stream.shutdown().await;
+                    }
+                });
+            },
 
             ProxyType::Multiple(proxy_addr) => {
                 let mut current = 0;
                 let proxy_size = proxy_addr.len();
                 let health_result = Arc::new(RwLock::new(vec![true; proxy_size]));
                 if let Some(health_path) = &config.proxy_health {
-                    check_health(proxy_addr.clone(), health_path.clone(), health_result.clone());
+                    check_health(
+                        proxy_addr.clone(),
+                        health_path.clone(),
+                        health_result.clone(),
+                    );
                 }
                 loop {
                     let (mut stream, addr) = tcp_listener.accept().await?;
@@ -81,7 +80,10 @@ pub async fn listen(config: &ServerConfig) -> Result<(), Error> {
                         iter_count += 1;
                     }
                     let balanced_proxy_address = proxy_addr[current].clone();
-                    println!("Received Proxy request, proxying to {}", balanced_proxy_address);
+                    println!(
+                        "Received Proxy request, proxying to {}",
+                        balanced_proxy_address
+                    );
                     tokio::spawn(async move {
                         if let Err(e) = handle_proxy(&mut stream, &balanced_proxy_address).await {
                             eprintln!("Error handling {}: {}", addr, e);

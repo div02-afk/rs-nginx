@@ -1,4 +1,8 @@
-use std::{io::Error, path::PathBuf, sync::Arc};
+use std::{
+    io::Error,
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
 use tokio::{
     fs,
@@ -13,13 +17,13 @@ use crate::{
 
 pub async fn handle_static_files(
     stream: &mut TcpStream,
-    root: &PathBuf,
+    root: &Path,
     cache: &Arc<Cache>,
 ) -> Result<(), Error> {
     let mut buff = [0; 1024];
 
     let n = match stream.read(&mut buff).await {
-        Ok(n) if n == 0 => {
+        Ok(0) => {
             return Err(Error::other("Empty buffer"));
         }
         Ok(n) => n,
@@ -39,23 +43,23 @@ pub async fn handle_static_files(
     //checking cached response
 
     if let Some(path) = safe_path(root, requested_path) {
-        if method.to_lowercase().eq("get") {
-            if let Some(data) = cache.get(&path).await {
-                stream
-                    .write_all(create_response(&data, &path).as_bytes())
-                    .await
-                    .unwrap();
-                // Send file contents
-                stream.write_all(&data).await.unwrap();
-                stream.flush().await.unwrap();
+        if method.to_lowercase().eq("get")
+            && let Some(data) = cache.get(&path).await
+        {
+            stream
+                .write_all(create_response(&data, &path).as_bytes())
+                .await
+                .unwrap();
+            // Send file contents
+            stream.write_all(&data).await.unwrap();
+            stream.flush().await.unwrap();
 
-                println!("Cached Ok");
-                return Ok(());
-            }
+            println!("Cached Ok");
+            return Ok(());
         }
         let file_result = fs::File::open(&path).await;
-        if file_result.is_ok() {
-            let mut file = file_result.unwrap();
+        if let Ok(file) = file_result {
+            let mut file = file;
             println!("file size: {:?}", file.metadata().await.unwrap().len());
             let mut contents = Vec::new();
             let _ = file.read_to_end(&mut contents).await.unwrap();
@@ -89,12 +93,12 @@ pub async fn handle_static_files(
     let _ = stream.flush().await;
     let _ = stream.shutdown().await;
 
-    return Err(Error::other("Invalid path requested"));
+    Err(Error::other("Invalid path requested"))
 }
 
-fn safe_path(root: &PathBuf, requested_path: &str) -> Option<PathBuf> {
-    let requested_path = requested_path.trim_start_matches(|c| c == '/' || c == '\\');
-    let path = root.as_path().join(requested_path);
+fn safe_path(root: &Path, requested_path: &str) -> Option<PathBuf> {
+    let requested_path = requested_path.trim_start_matches(['/', '\\']);
+    let path = root.join(requested_path);
     // println!("root {:?},requested {}, pathbuf {:?}", root, requested_path, path);
     if let (Ok(path), Ok(canon_root)) = (path.canonicalize(), root.canonicalize()) {
         if path.starts_with(&canon_root) {
@@ -107,5 +111,5 @@ fn safe_path(root: &PathBuf, requested_path: &str) -> Option<PathBuf> {
         }
     }
 
-    return None;
+    None
 }

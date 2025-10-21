@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path};
 
 pub const NOT_FOUND_RESPONSE: &[
     u8;
@@ -10,7 +10,7 @@ pub const BAD_REQUEST_RESPONSE: &[
     92
 ] = b"HTTP/1.1 400 BAD REQUEST\r\nContent-Length: 0\r\nContent-Type: text/plain\r\nConnection: close\r\n\r\n";
 
-pub fn create_response(contents: &Vec<u8>, path: &PathBuf) -> String {
+pub fn create_response(contents: &[u8], path: &Path) -> String {
     let content_type = if path.extension().and_then(|s| s.to_str()) == Some("html") {
         "text/html"
     } else if path.extension().and_then(|s| s.to_str()) == Some("css") {
@@ -27,5 +27,5 @@ pub fn create_response(contents: &Vec<u8>, path: &PathBuf) -> String {
         content_type
     );
 
-    return response;
+    response
 }

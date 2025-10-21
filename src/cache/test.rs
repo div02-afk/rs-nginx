@@ -1,15 +1,8 @@
 #[cfg(test)]
 mod tests {
     use crate::cache::lru::Cache;
-    use std::{
-        path::{Path, PathBuf},
-        sync::Arc,
-        thread::spawn,
-    };
+    use std::{path::Path, sync::Arc};
     use test_log::test;
-
-    use super::*; // import symbols from parent module
-    use tokio::{self, task::JoinHandle};
 
     #[test(tokio::test)]
     async fn test_single_threaded_lru_cache() {
