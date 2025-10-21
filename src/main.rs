@@ -5,8 +5,8 @@ mod cache;
 mod config;
 mod handler;
 mod listener;
-mod response_builder;
 mod load_balancer;
+mod response_builder;
 
 #[tokio::main]
 async fn main() {

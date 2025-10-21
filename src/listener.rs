@@ -2,7 +2,7 @@ use std::{ io::Error, path::PathBuf, sync::Arc, thread::sleep, time::Duration };
 
 use crate::{
     cache::lru::Cache,
-    config::{ self, ProxyType, ServerConfig },
+    config::{ ProxyType, ServerConfig },
     handler::{ proxy_handler::handle_proxy, static_handler::handle_static_files },
     load_balancer::{ health_check::check_health, round_robin::get_next_server },
 };
@@ -38,7 +38,7 @@ pub async fn listen(config: &ServerConfig) -> Result<(), Error> {
     } else if config.proxy.is_some() {
         let proxy_addr = config.proxy.clone().unwrap();
         match proxy_addr {
-            ProxyType::Single(proxy_addr) => {
+            ProxyType::Single(proxy_addr) =>
                 loop {
                     let (mut stream, addr) = tcp_listener.accept().await?;
                     let proxy_addr_clone = proxy_addr.clone();
@@ -50,7 +50,6 @@ pub async fn listen(config: &ServerConfig) -> Result<(), Error> {
                         }
                     });
                 }
-            }
 
             ProxyType::Multiple(proxy_addr) => {
                 let mut current = 0;
@@ -82,11 +81,7 @@ pub async fn listen(config: &ServerConfig) -> Result<(), Error> {
                         iter_count += 1;
                     }
                     let balanced_proxy_address = proxy_addr[current].clone();
-                    println!(
-                        "Received Proxy request, proxying to {} {}",
-                        balanced_proxy_address,
-                        current
-                    );
+                    println!("Received Proxy request, proxying to {}", balanced_proxy_address);
                     tokio::spawn(async move {
                         if let Err(e) = handle_proxy(&mut stream, &balanced_proxy_address).await {
                             eprintln!("Error handling {}: {}", addr, e);

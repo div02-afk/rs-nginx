@@ -10,13 +10,15 @@ Simple Node.js test servers for testing the rs-ngnix load balancer.
 
 ## Usage
 
-### Start both servers (PowerShell):
+### Start both servers (PowerShell)
+
 ```powershell
 cd test
 .\start-servers.ps1
 ```
 
-### Start servers manually:
+### Start servers manually
+
 ```powershell
 # Terminal 1
 node server.js 3001
@@ -25,7 +27,8 @@ node server.js 3001
 node server.js 3002
 ```
 
-### Test the servers:
+### Test the servers
+
 ```powershell
 # Test server 1
 curl http://127.0.0.1:3001/health
@@ -50,6 +53,7 @@ http:
 ```
 
 Then access through your proxy:
+
 ```powershell
 curl http://localhost:8081/health
 curl http://localhost:8081/hello

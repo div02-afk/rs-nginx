@@ -1,9 +1,9 @@
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::io::{ AsyncReadExt, AsyncWriteExt };
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 use tokio::sync::RwLock;
-use tokio::time::{ sleep, timeout };
+use tokio::time::{sleep, timeout};
 
 async fn check_health_single(address: &str, path: &str) -> Result<bool, std::io::Error> {
     // Connect to the backend server
@@ -12,8 +12,7 @@ async fn check_health_single(address: &str, path: &str) -> Result<bool, std::io:
     // Send a simple HTTP GET request
     let request = format!(
         "GET {} HTTP/1.1\r\nHost: {}\r\nConnection: close\r\n\r\n",
-        path,
-        address
+        path, address
     );
 
     stream.write_all(request.as_bytes()).await?;
@@ -44,7 +43,7 @@ async fn health_probe(address: &String, path: &String) -> bool {
     match result {
         Ok(Ok(healthy)) => healthy,
         Ok(Err(_)) => false, // Connection error
-        Err(_) => false, // Timeout
+        Err(_) => false,     // Timeout
     }
 }
 

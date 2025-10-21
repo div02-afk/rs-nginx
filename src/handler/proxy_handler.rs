@@ -2,7 +2,6 @@ use std::io::Error;
 
 use tokio::{io::copy, net::TcpStream, try_join};
 
-
 pub async fn handle_proxy(
     request_stream: &mut TcpStream,
     proxy_address: &String,
@@ -23,5 +22,3 @@ pub async fn handle_proxy(
         return Err(client_stream_result.err().unwrap());
     }
 }
-
-
