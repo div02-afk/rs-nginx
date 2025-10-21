@@ -6,6 +6,7 @@ mod config;
 mod handler;
 mod listener;
 mod response_builder;
+mod load_balancer;
 
 #[tokio::main]
 async fn main() {

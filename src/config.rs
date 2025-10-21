@@ -1,6 +1,6 @@
-use std::{fs::File, path::Path};
+use std::{ fs::File, path::Path };
 
-use serde::{Deserialize, Serialize};
+use serde::{ Deserialize, Serialize };
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct StaticFileConfig {
@@ -9,11 +9,20 @@ pub struct StaticFileConfig {
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[serde(untagged)]
+pub enum ProxyType {
+    Single(String),
+    Multiple(Vec<String>),
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct ServerConfig {
     pub listen: u16,
     pub cache: Option<usize>,
     pub root: Option<String>,
-    pub proxy: Option<String>,
+    pub proxy: Option<ProxyType>,
+    pub proxy_health: Option<String>,
+    pub strategy: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
