@@ -1,4 +1,4 @@
-use std::path::{Path};
+use std::path::Path;
 
 pub const NOT_FOUND_RESPONSE: &[
     u8;

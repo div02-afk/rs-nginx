@@ -5,11 +5,26 @@ Write-Host "Starting test servers..." -ForegroundColor Green
 # Start server on port 3001
 Start-Process powershell -ArgumentList "-NoExit", "-Command", "node server.js 3001"
 
-# Wait a bit before starting the second server
+# Wait a bit before starting the next server
 Start-Sleep -Seconds 1
 
 # Start server on port 3002
 Start-Process powershell -ArgumentList "-NoExit", "-Command", "node server.js 3002"
+# Wait a bit before starting the next server
+Start-Sleep -Seconds 1
+
+# Start server on port 3002
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "node server.js 3003"
+# Wait a bit before starting the next server
+Start-Sleep -Seconds 1
+
+# Start server on port 3002
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "node server.js 3004"
+# Wait a bit before starting the next server
+Start-Sleep -Seconds 1
+
+# Start server on port 3002
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "node server.js 3005"
 
 Write-Host ""
 Write-Host "Test servers started!" -ForegroundColor Green

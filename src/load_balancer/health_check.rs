@@ -36,7 +36,7 @@ async fn check_health_single(address: &str, path: &str) -> Result<bool, std::io:
 /// Performs a simple HTTP health check on the given address
 /// Returns true if the server responds with HTTP 200, false otherwise
 async fn health_probe(address: &String, path: &str) -> bool {
-    println!("Checking health for {}", address);
+    // println!("Checking health for {}", address);
     // Set a timeout for the health check (5 seconds)
     let result = timeout(Duration::from_secs(5), check_health_single(address, path)).await;
 
@@ -48,7 +48,7 @@ async fn health_probe(address: &String, path: &str) -> bool {
 }
 
 pub fn check_health(addresses: Vec<String>, path: String, health_result: Arc<RwLock<Vec<bool>>>) {
-    println!("checking health");
+    // println!("checking health");
     tokio::spawn(async move {
         let addr_clone = addresses.clone();
         loop {

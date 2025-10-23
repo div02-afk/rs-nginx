@@ -6,4 +6,8 @@ http:
     proxy:
       - "127.0.0.1:3001"
       - "127.0.0.1:3002"
-    proxy_health : "/health"
+      - "127.0.0.1:3003"
+      - "127.0.0.1:3004"
+      - "127.0.0.1:3005"
+    proxy_health: "/health"
+    strategy: "random"
