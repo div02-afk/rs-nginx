@@ -1,6 +1,6 @@
-use std::{fs::File, path::Path};
+use std::{ fs::File, io::Error, path::Path};
 
-use serde::{Deserialize, Serialize};
+use serde::{ Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct StaticFileConfig {
@@ -23,6 +23,7 @@ pub struct ServerConfig {
     pub proxy: Option<ProxyType>,
     pub proxy_health: Option<String>,
     pub strategy: Option<String>,
+    pub weights: Option<Vec<u8>>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -32,5 +33,25 @@ pub struct Config {
 
 pub fn read_config(config_path: &Path) -> Config {
     let file = File::open(config_path).expect("Config file not found");
-    serde_yaml::from_reader(file).expect("Invalid Config format")
+    let config  = serde_yaml::from_reader(file).expect("Invalid Config format");
+
+
+
+    config
+}
+
+
+fn validate(config : &Config) -> Result<(),Error> {
+    let config = config.clone();
+    for server_config in &config.http {
+        if let Some(weights) = &server_config.weights {
+            for weight in weights {
+                if *weight == 0 {
+                   return Err(Error::other("Invalid weights: Weights can't be 0"));
+                }
+            }
+        }
+    }
+
+    Ok(())
 }

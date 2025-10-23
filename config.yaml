@@ -10,4 +10,10 @@ http:
       - "127.0.0.1:3004"
       - "127.0.0.1:3005"
     proxy_health: "/health"
-    strategy: "random"
+    strategy: "weighted_round_robin"
+    weights:
+      - 1
+      - 1
+      - 5
+      - 1
+      - 5

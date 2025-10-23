@@ -1,12 +1,15 @@
-use std::{io::Error, path::PathBuf, sync::Arc, thread::sleep, time::Duration};
+use std::{io::Error, ops::Add, path::PathBuf, sync::Arc, thread::sleep, time::Duration};
 
 use crate::{
     cache::lru::Cache,
     config::{ProxyType, ServerConfig},
-    constants::strategies::{RANDOM, ROUND_ROBIN},
+    constants::strategies::{RANDOM, ROUND_ROBIN, WEIGHTED_ROUND_ROBIN},
     handler::{proxy_handler::handle_proxy, static_handler::handle_static_files},
     listener::static_listener::{self, static_listener},
-    load_balancer::{health_check::check_health, random, round_robin},
+    load_balancer::{
+        health_check::check_health,
+        strategy::{Context, Random, RoundRobin, Strategy, WeightedRoundRobin},
+    },
 };
 use tokio::{io::AsyncWriteExt, net::TcpListener, sync::RwLock};
 
@@ -47,23 +50,27 @@ pub async fn listen(config: &ServerConfig) -> Result<(), Error> {
                     );
                 }
 
-                let get_next_server: fn(usize, usize) -> usize = get_load_balancer_strategy(config);
+                let mut strategy = get_load_balancer_strategy(config);
+                let server_context = Context {
+                    size: proxy_size,
+                    weights: get_server_weights(config, proxy_size),
+                };
 
                 loop {
                     let (mut stream, addr) = tcp_listener.accept().await?;
-                    let iter_count: usize = 0;
-                    let fail_count: usize = 0;
-                    get_healthy_server(
-                        &mut current,
+                    let current = get_healthy_server(
                         proxy_size,
                         &health_result,
-                        get_next_server,
-                        &mut stream,
-                        iter_count,
-                        fail_count,
+                        &mut strategy,
+                        &server_context,
                     )
                     .await;
-                    let balanced_proxy_address = proxy_addr[current].clone();
+                    if current.is_none() {
+                        println!("No live server found");
+                        stream.shutdown().await.unwrap();
+                    }
+
+                    let balanced_proxy_address = proxy_addr[current.unwrap()].clone();
                     println!(
                         "Received Proxy request, proxying to {}",
                         balanced_proxy_address
@@ -81,54 +88,64 @@ pub async fn listen(config: &ServerConfig) -> Result<(), Error> {
     Ok(())
 }
 
-fn get_load_balancer_strategy(config: &ServerConfig) -> fn(usize, usize) -> usize {
+fn get_load_balancer_strategy(config: &ServerConfig) -> Box<dyn Strategy + Send + Sync> {
     match &config.strategy {
         Some(strategy) => {
             println!("Got strategy {}", strategy);
             match strategy.as_str() {
-                ROUND_ROBIN => {
-                    println!("RR selected");
-                    round_robin::get_next_server
-                }
-                RANDOM => random::get_next_server,
+                ROUND_ROBIN => Box::new(RoundRobin { current: 0 }),
+                RANDOM => Box::new(Random {}),
+                WEIGHTED_ROUND_ROBIN => Box::new(WeightedRoundRobin {
+                    current: 0,
+                    current_count: 0,
+                }),
                 _ => {
                     println!("Unknown-stragegy");
-                    random::get_next_server
+                    Box::new(Random {})
                 }
             }
         }
         None => {
             println!("No strategy");
-            random::get_next_server
+            Box::new(Random {})
         }
     }
 }
 
 async fn get_healthy_server(
-    current: &mut usize,
     proxy_size: usize,
     health_result: &Arc<RwLock<Vec<bool>>>,
-    get_next_server: fn(usize, usize) -> usize,
-    stream: &mut tokio::net::TcpStream,
-    mut iter_count: usize,
-    mut fail_count: usize,
-) {
+    strategy: &mut Box<dyn Strategy + Send + Sync>,
+    context: &Context,
+) -> Option<usize> {
+    let mut iter_count = 0;
+    let mut fail_count: usize = 0;
+    let mut sleep_dur = Duration::from_secs(2);
     loop {
         if iter_count > proxy_size {
             iter_count = 0;
             fail_count += 1;
 
             if fail_count > 3 {
-                let _ = stream.shutdown().await;
+                return None;
             }
-            sleep(Duration::from_secs(2));
+            sleep(sleep_dur);
+            sleep_dur = sleep_dur.add(Duration::from_secs(1));
         }
 
-        *current = get_next_server(proxy_size, *current);
-        if health_result.read().await[*current] {
-            return;
+        let current = strategy.get_next_server(context);
+        if health_result.read().await[current] {
+            return Some(current);
         }
 
         iter_count += 1;
+    }
+}
+
+fn get_server_weights(config: &ServerConfig, proxy_size: usize) -> Vec<u8> {
+    if let Some(weights) = &config.weights {
+        weights.iter().take(proxy_size).copied().collect()
+    } else {
+        vec![1; proxy_size]
     }
 }
