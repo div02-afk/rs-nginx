@@ -1,11 +1,11 @@
-use std::{io::Error, ops::Add, path::PathBuf, sync::Arc, thread::sleep, time::Duration};
+use std::{io::Error, ops::Add, sync::Arc, thread::sleep, time::Duration};
 
 use crate::{
     cache::lru::Cache,
     config::{ProxyType, ServerConfig},
     constants::strategies::{RANDOM, ROUND_ROBIN, WEIGHTED_ROUND_ROBIN},
-    handler::{proxy_handler::handle_proxy, static_handler::handle_static_files},
-    listener::static_listener::{self, static_listener},
+    handler::proxy_handler::handle_proxy,
+    listener::static_listener::static_listener,
     load_balancer::{
         health_check::check_health,
         strategy::{Context, Random, RoundRobin, Strategy, WeightedRoundRobin},
@@ -38,9 +38,8 @@ pub async fn listen(config: &ServerConfig) -> Result<(), Error> {
             },
 
             ProxyType::Multiple(proxy_addr) => {
-                let mut current = 0;
                 let proxy_size = proxy_addr.len();
-                println!("Proxy size {} ", proxy_size);
+                // println!("Proxy size {} ", proxy_size);
                 let health_result = Arc::new(RwLock::new(vec![true; proxy_size]));
                 if let Some(health_path) = &config.proxy_health {
                     check_health(
@@ -91,7 +90,7 @@ pub async fn listen(config: &ServerConfig) -> Result<(), Error> {
 fn get_load_balancer_strategy(config: &ServerConfig) -> Box<dyn Strategy + Send + Sync> {
     match &config.strategy {
         Some(strategy) => {
-            println!("Got strategy {}", strategy);
+            // println!("Got strategy {}", strategy);
             match strategy.as_str() {
                 ROUND_ROBIN => Box::new(RoundRobin { current: 0 }),
                 RANDOM => Box::new(Random {}),
@@ -100,13 +99,13 @@ fn get_load_balancer_strategy(config: &ServerConfig) -> Box<dyn Strategy + Send 
                     current_count: 0,
                 }),
                 _ => {
-                    println!("Unknown-stragegy");
+                    println!("Unknown-stragegy, proceeding with random");
                     Box::new(Random {})
                 }
             }
         }
         None => {
-            println!("No strategy");
+            println!("No strategy, proceeding with random");
             Box::new(Random {})
         }
     }
