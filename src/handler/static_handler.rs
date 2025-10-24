@@ -167,7 +167,7 @@ async fn handle_chunked_file(
                 stream.flush().await.unwrap();
                 return;
             } else {
-                stream.write_all(&buffer[..n]).await.unwrap();
+                let _ = stream.write_all(&buffer[..n]).await;
             }
         }
     }
