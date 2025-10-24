@@ -13,6 +13,8 @@ use tokio::{
 
 use crate::{
     cache::lru::Cache,
+    compression::gzip::{Encoding, compress_stream},
+    constants::encodings::GZIP,
     response_builder::http::{
         BAD_REQUEST_RESPONSE, NOT_FOUND_RESPONSE, create_response, get_file_type,
     },
@@ -40,9 +42,21 @@ pub async fn handle_static_files(
     let mut parts = request_line.split_whitespace();
     let method = parts.next().unwrap_or("");
     let requested_path = parts.next().unwrap_or("/");
+    let mut encodings: Vec<&str> = Vec::new();
+    for line in request.lines() {
+        if line.to_lowercase().contains("accept-encoding: ") {
+            let mut encoding_parts = line.split_ascii_whitespace();
+            let _ = encoding_parts.next().unwrap(); //iterate over key name
+
+            for encoding in encoding_parts {
+                encodings.push(encoding.trim_end_matches(","));
+            }
+            break;
+        }
+    }
 
     println!("Method {}, Path {}", method, requested_path);
-
+    println!("Encodings supported {:?}", encodings);
     //checking cached response
 
     if let Some(path) = safe_path(root, requested_path) {
@@ -66,6 +80,19 @@ pub async fn handle_static_files(
             let metadata = file.metadata().await.unwrap();
             let file_size = metadata.len();
             println!("file size: {}", file_size);
+
+            //compressed
+            for encoding in encodings {
+                if encoding == GZIP {
+                    write_header(stream, &metadata, &path, Encoding::GZIP).await;
+                    // let buf = Vec::new();
+                    let _ = compress_stream(&mut file, stream).await;
+
+                    return Ok(());
+                }
+            }
+
+            //uncompressed
             if file_size < 1024 * 1024 * 100 {
                 handle_unchuncked_file(&mut file, &metadata, cache, stream, &path).await;
             } else {
@@ -119,20 +146,10 @@ async fn handle_unchuncked_file(
     path: &PathBuf,
 ) {
     let mut contents = Vec::new();
-    let file_size = metadata.len();
     let _ = file.read_to_end(&mut contents).await.unwrap();
-    let file_type = get_file_type(path);
     cache.add(path, &contents).await;
 
-    // Send headers
-    stream
-        .write_all(format!(
-        "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nContent-Type: {}\r\nConnection: close\r\n\r\n",
-        file_size,
-        file_type
-    ).as_bytes())
-        .await
-        .unwrap();
+    write_header(stream, metadata, path, Encoding::NONE).await;
 
     // Send file contents
     stream.write_all(&contents).await.unwrap();
@@ -148,18 +165,7 @@ async fn handle_chunked_file(
 ) {
     const BUFFER_SIZE: usize = 1024 * 16; //16KB
     let mut buffer: [u8; BUFFER_SIZE] = [0; BUFFER_SIZE];
-    let file_size = metadata.len();
-    let file_type = get_file_type(path);
-
-    stream
-        .write_all(format!(
-        "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nContent-Type: {}\r\nConnection: close\r\n\r\n",
-        file_size,
-        file_type
-    ).as_bytes())
-        .await
-        .unwrap();
-
+    write_header(stream, metadata, path, Encoding::NONE).await;
     loop {
         let bytes_read = file.read(&mut buffer).await;
         if let Ok(n) = bytes_read {
@@ -170,5 +176,35 @@ async fn handle_chunked_file(
                 let _ = stream.write_all(&buffer[..n]).await;
             }
         }
+    }
+}
+
+async fn write_header(
+    stream: &mut TcpStream,
+    metadata: &Metadata,
+    path: &Path,
+    encoding: Encoding,
+) {
+    let file_size = metadata.len();
+    let file_type = get_file_type(path);
+    let parsed_encoding = match encoding {
+        Encoding::GZIP => "gzip",
+        Encoding::NONE => "",
+    };
+
+    if parsed_encoding.is_empty() {
+        let response = format!(
+            "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nContent-Type: {}\r\n\r\n",
+            file_size, file_type
+        );
+        println!("Response: {}", response);
+        stream.write_all(response.as_bytes()).await.unwrap();
+    } else {
+        let response = format!(
+            "HTTP/1.1 200 OK\r\nContent-Type: {}\r\nContent-Encoding: {}\r\nTransfer-Encoding: chunked\r\n\r\n",
+            file_type, parsed_encoding
+        );
+        println!("Response: {}", response);
+        stream.write_all(response.as_bytes()).await.unwrap();
     }
 }

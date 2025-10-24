@@ -10,6 +10,8 @@ serde_yaml = "0.9"
 serde = { version = "1.0.228", features = ["derive"] }
 test-log = "*"
 notify = "8.2.0"
+async-compression = {version ="0.4.32", features = ["tokio","gzip"]}
+
 
 
 # [dev-dependencies]

@@ -2,6 +2,7 @@ use crate::config::execute_config;
 use notify::{RecursiveMode, Watcher, recommended_watcher};
 use std::{path::Path, sync::mpsc::channel, time::Duration};
 mod cache;
+mod compression;
 mod config;
 mod constants;
 mod handler;
