@@ -1,18 +1,21 @@
 use std::{
+    fs::Metadata,
     io::Error,
     path::{Path, PathBuf},
     sync::Arc,
 };
 
 use tokio::{
-    fs,
+    fs::{self, File},
     io::{AsyncReadExt, AsyncWriteExt},
     net::TcpStream,
 };
 
 use crate::{
     cache::lru::Cache,
-    response_builder::http::{BAD_REQUEST_RESPONSE, NOT_FOUND_RESPONSE, create_response},
+    response_builder::http::{
+        BAD_REQUEST_RESPONSE, NOT_FOUND_RESPONSE, create_response, get_file_type,
+    },
 };
 
 pub async fn handle_static_files(
@@ -60,21 +63,15 @@ pub async fn handle_static_files(
         let file_result = fs::File::open(&path).await;
         if let Ok(file) = file_result {
             let mut file = file;
-            println!("file size: {:?}", file.metadata().await.unwrap().len());
-            let mut contents = Vec::new();
-            let _ = file.read_to_end(&mut contents).await.unwrap();
-            cache.add(&path, &contents).await;
-            // Send headers
-            stream
-                .write_all(create_response(&contents, &path).as_bytes())
-                .await
-                .unwrap();
+            let metadata = file.metadata().await.unwrap();
+            let file_size = metadata.len();
+            println!("file size: {}", file_size);
+            if file_size < 1024 * 1024 * 100 {
+                handle_unchuncked_file(&mut file, &metadata, cache, stream, &path).await;
+            } else {
+                handle_chunked_file(&mut file, &metadata, cache, stream, &path).await;
+            }
 
-            // Send file contents
-            stream.write_all(&contents).await.unwrap();
-            stream.flush().await.unwrap();
-
-            println!("Ok");
             return Ok(());
         } else {
             // Send 404 response before closing
@@ -112,4 +109,66 @@ fn safe_path(root: &Path, requested_path: &str) -> Option<PathBuf> {
     }
 
     None
+}
+
+async fn handle_unchuncked_file(
+    file: &mut File,
+    metadata: &Metadata,
+    cache: &Arc<Cache>,
+    stream: &mut TcpStream,
+    path: &PathBuf,
+) {
+    let mut contents = Vec::new();
+    let file_size = metadata.len();
+    let _ = file.read_to_end(&mut contents).await.unwrap();
+    let file_type = get_file_type(path);
+    cache.add(path, &contents).await;
+
+    // Send headers
+    stream
+        .write_all(format!(
+        "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nContent-Type: {}\r\nConnection: close\r\n\r\n",
+        file_size,
+        file_type
+    ).as_bytes())
+        .await
+        .unwrap();
+
+    // Send file contents
+    stream.write_all(&contents).await.unwrap();
+    stream.flush().await.unwrap();
+}
+
+async fn handle_chunked_file(
+    file: &mut File,
+    metadata: &Metadata,
+    cache: &Arc<Cache>,
+    stream: &mut TcpStream,
+    path: &Path,
+) {
+    const BUFFER_SIZE: usize = 1024 * 16; //16KB
+    let mut buffer: [u8; BUFFER_SIZE] = [0; BUFFER_SIZE];
+    let file_size = metadata.len();
+    let file_type = get_file_type(path);
+
+    stream
+        .write_all(format!(
+        "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nContent-Type: {}\r\nConnection: close\r\n\r\n",
+        file_size,
+        file_type
+    ).as_bytes())
+        .await
+        .unwrap();
+
+    loop {
+        let bytes_read = file.read(&mut buffer).await;
+        if let Ok(n) = bytes_read {
+            if n == 0 {
+                stream.flush().await.unwrap();
+                return;
+            } else {
+                stream.write_all(&buffer[..n]).await.unwrap();
+            }
+        }
+    }
 }

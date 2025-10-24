@@ -3,7 +3,7 @@ use std::{fs::File, io::Error, path::Path, sync::Arc};
 use serde::{Deserialize, Serialize};
 use tokio::task::JoinHandle;
 
-use crate::listener::listener::listen;
+use crate::listener::http::listen;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct StaticFileConfig {
@@ -42,7 +42,7 @@ pub fn read_config(config_path: &Path) -> Option<Config> {
         println!("{:?}", validation.err());
         return None;
     }
-    return Some(config);
+    Some(config)
 }
 
 fn validate(config: &Config) -> Result<(), Error> {

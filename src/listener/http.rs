@@ -1,4 +1,4 @@
-use std::{io::Error, ops::Add, sync::Arc, thread::sleep, time::Duration};
+use std::{io::Error, ops::Add, sync::Arc, time::Duration};
 
 use crate::{
     cache::lru::Cache,
@@ -11,7 +11,7 @@ use crate::{
         strategy::{Context, Random, RoundRobin, Strategy, WeightedRoundRobin},
     },
 };
-use tokio::{io::AsyncWriteExt, net::TcpListener, sync::RwLock};
+use tokio::{io::AsyncWriteExt, net::TcpListener, sync::RwLock, time::sleep};
 
 pub async fn listen(config: &ServerConfig) -> Result<(), Error> {
     let addr = format!("0.0.0.0:{}", config.listen);
@@ -67,6 +67,7 @@ pub async fn listen(config: &ServerConfig) -> Result<(), Error> {
                     if current.is_none() {
                         println!("No live server found");
                         stream.shutdown().await.unwrap();
+                        continue;
                     }
 
                     let balanced_proxy_address = proxy_addr[current.unwrap()].clone();
@@ -99,7 +100,7 @@ fn get_load_balancer_strategy(config: &ServerConfig) -> Box<dyn Strategy + Send 
                     current_count: 0,
                 }),
                 _ => {
-                    println!("Unknown-stragegy, proceeding with random");
+                    println!("Unknown strategy, proceeding with random");
                     Box::new(Random {})
                 }
             }
@@ -128,7 +129,7 @@ async fn get_healthy_server(
             if fail_count > 3 {
                 return None;
             }
-            sleep(sleep_dur);
+            sleep(sleep_dur).await;
             sleep_dur = sleep_dur.add(Duration::from_secs(1));
         }
 
@@ -143,7 +144,15 @@ async fn get_healthy_server(
 
 fn get_server_weights(config: &ServerConfig, proxy_size: usize) -> Vec<u8> {
     if let Some(weights) = &config.weights {
-        weights.iter().take(proxy_size).copied().collect()
+        let mut result = weights.clone();
+        if result.len() < proxy_size {
+            // Pad with default weight 1 if not enough weights are provided
+            result.extend(vec![1; proxy_size - result.len()]);
+        } else if result.len() > proxy_size {
+            // Truncate if too many weights are provided
+            result.truncate(proxy_size);
+        }
+        result
     } else {
         vec![1; proxy_size]
     }

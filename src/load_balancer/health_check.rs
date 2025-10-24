@@ -35,7 +35,7 @@ async fn check_health_single(address: &str, path: &str) -> Result<bool, std::io:
 
 /// Performs a simple HTTP health check on the given address
 /// Returns true if the server responds with HTTP 200, false otherwise
-async fn health_probe(address: &String, path: &str) -> bool {
+async fn health_probe(address: &str, path: &str) -> bool {
     // println!("Checking health for {}", address);
     // Set a timeout for the health check (5 seconds)
     let result = timeout(Duration::from_secs(5), check_health_single(address, path)).await;
