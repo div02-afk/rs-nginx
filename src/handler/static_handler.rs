@@ -13,8 +13,7 @@ use tokio::{
 
 use crate::{
     cache::lru::Cache,
-    compression::gzip::{Encoding, compress_stream},
-    constants::encodings::GZIP,
+    compression::core::{Encoding, compress_stream, parse_encoding},
     response_builder::http::{
         BAD_REQUEST_RESPONSE, NOT_FOUND_RESPONSE, create_response, get_file_type,
     },
@@ -42,21 +41,24 @@ pub async fn handle_static_files(
     let mut parts = request_line.split_whitespace();
     let method = parts.next().unwrap_or("");
     let requested_path = parts.next().unwrap_or("/");
-    let mut encodings: Vec<&str> = Vec::new();
+    let mut encodings: Vec<Encoding> = Vec::new();
     for line in request.lines() {
         if line.to_lowercase().contains("accept-encoding: ") {
             let mut encoding_parts = line.split_ascii_whitespace();
             let _ = encoding_parts.next().unwrap(); //iterate over key name
 
             for encoding in encoding_parts {
-                encodings.push(encoding.trim_end_matches(","));
+                let enc = parse_encoding(encoding.trim_end_matches(","));
+                if !enc.string_value().is_empty() {
+                    encodings.push(enc);
+                }
             }
             break;
         }
     }
 
     println!("Method {}, Path {}", method, requested_path);
-    println!("Encodings supported {:?}", encodings);
+
     //checking cached response
 
     if let Some(path) = safe_path(root, requested_path) {
@@ -82,14 +84,11 @@ pub async fn handle_static_files(
             println!("file size: {}", file_size);
 
             //compressed
-            for encoding in encodings {
-                if encoding == GZIP {
-                    write_header(stream, &metadata, &path, Encoding::GZIP).await;
-                    // let buf = Vec::new();
-                    let _ = compress_stream(&mut file, stream).await;
-
-                    return Ok(());
-                }
+            if let Some(encoding) = encodings.into_iter().next() {
+                write_header(stream, &metadata, &path, &encoding).await;
+                // let buf = Vec::new();
+                let _ = compress_stream(&mut file, stream, encoding).await;
+                return Ok(());
             }
 
             //uncompressed
@@ -149,7 +148,7 @@ async fn handle_unchuncked_file(
     let _ = file.read_to_end(&mut contents).await.unwrap();
     cache.add(path, &contents).await;
 
-    write_header(stream, metadata, path, Encoding::NONE).await;
+    write_header(stream, metadata, path, &Encoding::None()).await;
 
     // Send file contents
     stream.write_all(&contents).await.unwrap();
@@ -165,7 +164,7 @@ async fn handle_chunked_file(
 ) {
     const BUFFER_SIZE: usize = 1024 * 16; //16KB
     let mut buffer: [u8; BUFFER_SIZE] = [0; BUFFER_SIZE];
-    write_header(stream, metadata, path, Encoding::NONE).await;
+    write_header(stream, metadata, path, &Encoding::None()).await;
     loop {
         let bytes_read = file.read(&mut buffer).await;
         if let Ok(n) = bytes_read {
@@ -183,14 +182,11 @@ async fn write_header(
     stream: &mut TcpStream,
     metadata: &Metadata,
     path: &Path,
-    encoding: Encoding,
+    encoding: &Encoding,
 ) {
     let file_size = metadata.len();
     let file_type = get_file_type(path);
-    let parsed_encoding = match encoding {
-        Encoding::GZIP => "gzip",
-        Encoding::NONE => "",
-    };
+    let parsed_encoding = encoding.string_value();
 
     if parsed_encoding.is_empty() {
         let response = format!(
